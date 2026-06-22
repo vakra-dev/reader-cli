@@ -9,7 +9,7 @@ import { execSync } from "child_process";
 import { join } from "path";
 import { existsSync, readFileSync, unlinkSync } from "fs";
 
-const CLI = "npx tsx src/index.ts";
+const CLI = "node dist/index.js";
 const CWD = join(import.meta.dirname, "..");
 const API_KEY = process.env.READER_API_KEY;
 

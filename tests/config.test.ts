@@ -11,7 +11,7 @@ import { mkdirSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 
-const CLI = "npx tsx src/index.ts";
+const CLI = "node dist/index.js";
 const CWD = join(import.meta.dirname, "..");
 
 let testHome: string;
