@@ -11,10 +11,19 @@ export function registerConfigCommand(program: Command): void {
       const current = loadConfig();
 
       if (key === "api-key") {
+        if (!value.startsWith("rdr_")) {
+          console.error(`Warning: API key doesn't start with "rdr_". This may not be a valid Reader API key.`);
+        }
         current.apiKey = value;
         saveConfig(current);
         console.error(`API key saved: ${redactKey(value)}`);
       } else if (key === "api-url") {
+        try {
+          new URL(value);
+        } catch {
+          console.error(`Error: Invalid URL: "${value}"`);
+          process.exit(1);
+        }
         current.apiUrl = value;
         saveConfig(current);
         console.error(`API URL saved: ${value}`);

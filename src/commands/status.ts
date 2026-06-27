@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import { ReaderClient } from "@vakra-dev/reader-js";
 import { getApiKey, getApiUrl, redactKey } from "../utils/config.js";
+import { error, formatError, statusSpinner } from "../utils/output.js";
 import { version } from "../version.js";
 
 export function registerStatusCommand(program: Command): void {
@@ -16,13 +17,16 @@ export function registerStatusCommand(program: Command): void {
       console.log(`API:     ${apiUrl}`);
       console.log(`Key:     ${redactKey(apiKey)}`);
 
+      const spinner = statusSpinner();
+
       try {
         const credits = await client.getCredits();
+        spinner.success("Connected");
         console.log(`Credits: ${credits.balance} / ${credits.limit} (${credits.tier} tier)`);
         console.log(`Resets:  ${credits.resetAt}`);
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error(`API:     connection failed (${msg})`);
+        spinner.error("Connection failed");
+        error(formatError(err));
         process.exit(1);
       }
     });

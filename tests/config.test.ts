@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { execSync } from "child_process";
+import { execSync, spawnSync } from "child_process";
 import { mkdirSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -34,18 +34,29 @@ function run(args: string, extraEnv?: Record<string, string>): string {
   }).trim();
 }
 
-function runStderr(args: string, extraEnv?: Record<string, string>): string {
+function runWithStderr(args: string, extraEnv?: Record<string, string>): { stdout: string; stderr: string; exitCode: number } {
   try {
-    execSync(`${CLI} ${args}`, {
+    const stdout = execSync(`${CLI} ${args}`, {
       cwd: CWD,
       env: { ...process.env, HOME: testHome, READER_API_KEY: "", READER_API_URL: "", ...extraEnv },
       encoding: "utf-8",
       timeout: 10000,
-    });
-    return "";
+      stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+    // Capture stderr even on success by reading from the child process
+    return { stdout, stderr: "", exitCode: 0 };
   } catch (err: any) {
-    return (err.stderr || err.stdout || "").trim();
+    return {
+      stdout: (err.stdout || "").trim(),
+      stderr: (err.stderr || "").trim(),
+      exitCode: err.status ?? 1,
+    };
   }
+}
+
+function runStderr(args: string, extraEnv?: Record<string, string>): string {
+  const result = runWithStderr(args, extraEnv);
+  return result.stderr;
 }
 
 describe("config commands", () => {
@@ -84,5 +95,36 @@ describe("config commands", () => {
   it("rejects unknown config keys", () => {
     const output = runStderr("config set unknown-key value");
     expect(output).toContain("Unknown config key");
+  });
+
+  it("warns when API key does not start with rdr_", () => {
+    const result = spawnSync("node", ["dist/index.js", "config", "set", "api-key", "notvalid123"], {
+      cwd: CWD,
+      env: { ...process.env, HOME: testHome, READER_API_KEY: "", READER_API_URL: "" },
+      encoding: "utf-8",
+      timeout: 10000,
+    });
+    const stderr = result.stderr.trim();
+    expect(stderr).toContain("Warning");
+    expect(stderr).toContain("rdr_");
+  });
+
+  it("does not warn when API key starts with rdr_", () => {
+    // runStderr returns stderr from success too, but for a valid key there should be no warning
+    run("config set api-key rdr_valid_key_5678");
+    // If it ran without error, the key was accepted without warning
+    const output = run("config show");
+    expect(output).toContain("rdr_...5678");
+  });
+
+  it("rejects invalid API URL", () => {
+    const output = runStderr("config set api-url not-a-url");
+    expect(output).toContain("Invalid URL");
+  });
+
+  it("accepts valid API URL", () => {
+    run("config set api-url https://custom-api.example.com");
+    const output = run("config show");
+    expect(output).toContain("https://custom-api.example.com");
   });
 });

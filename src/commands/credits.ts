@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import { ReaderClient } from "@vakra-dev/reader-js";
 import { getApiKey, getApiUrl } from "../utils/config.js";
-import { outputJson, error } from "../utils/output.js";
+import { outputJson, error, formatError, creditsSpinner } from "../utils/output.js";
 
 export function registerCreditsCommand(program: Command): void {
   program
@@ -12,8 +12,11 @@ export function registerCreditsCommand(program: Command): void {
       const apiKey = getApiKey();
       const client = new ReaderClient({ apiKey, baseUrl: getApiUrl() });
 
+      const spinner = creditsSpinner();
+
       try {
         const credits = await client.getCredits();
+        spinner.stop();
 
         if (opts.json) {
           outputJson(credits);
@@ -25,8 +28,8 @@ export function registerCreditsCommand(program: Command): void {
         console.log(`Tier:    ${credits.tier}`);
         console.log(`Resets:  ${credits.resetAt}`);
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        error(msg);
+        spinner.error("Failed");
+        error(formatError(err));
         process.exit(1);
       }
     });

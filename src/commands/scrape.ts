@@ -1,7 +1,8 @@
 import type { Command } from "commander";
 import { ReaderClient } from "@vakra-dev/reader-js";
 import { getApiKey, getApiUrl } from "../utils/config.js";
-import { outputContent, outputJson, saveScreenshot, info, error } from "../utils/output.js";
+import { outputContent, outputJson, saveScreenshot, info, error, formatError, scrapeSpinner } from "../utils/output.js";
+import { normalizeUrl, validateFormat, parsePositiveInt } from "../utils/validate.js";
 
 export function registerScrapeCommand(program: Command): void {
   program
@@ -15,26 +16,22 @@ export function registerScrapeCommand(program: Command): void {
     .option("--exclude-tags <selectors>", "CSS selectors to exclude (comma-separated)")
     .option("--wait-for <selector>", "Wait for CSS selector before scraping")
     .option("--timeout <ms>", "Timeout in milliseconds", "30000")
-    .option("--proxy-mode <mode>", "Proxy mode: standard, stealth, auto")
-    .action(async (url: string, opts) => {
+    .option("--proxy-mode <mode>", "Proxy mode: standard (default) or premium")
+    .action(async (rawUrl: string, opts) => {
+      const url = normalizeUrl(rawUrl);
       const apiKey = getApiKey();
       const client = new ReaderClient({ apiKey, baseUrl: getApiUrl() });
 
-      const formats: Array<"markdown" | "html" | "screenshot"> = [];
-      const requestedFormat = opts.format as string;
-
-      if (requestedFormat === "screenshot") {
-        formats.push("screenshot");
-      } else if (requestedFormat === "html") {
-        formats.push("html");
-      } else {
-        formats.push("markdown");
-      }
+      const requestedFormat = validateFormat(opts.format);
+      const formats: Array<"markdown" | "html" | "screenshot"> = [requestedFormat];
 
       // If screenshot requested alongside another format
       if (requestedFormat !== "screenshot" && opts.output?.endsWith(".png")) {
         formats.push("screenshot");
       }
+
+      const timeout = parsePositiveInt(opts.timeout, "--timeout");
+      const spinner = scrapeSpinner();
 
       try {
         const result = await client.read({
@@ -44,12 +41,13 @@ export function registerScrapeCommand(program: Command): void {
           includeTags: opts.includeTags?.split(",").map((s: string) => s.trim()),
           excludeTags: opts.excludeTags?.split(",").map((s: string) => s.trim()),
           waitForSelector: opts.waitFor,
-          timeoutMs: parseInt(opts.timeout, 10),
+          timeoutMs: timeout,
           proxyMode: opts.proxyMode,
         });
 
         if (result.kind === "scrape") {
           const data = result.data;
+          spinner.success("Done -- content ready");
 
           if (opts.json) {
             outputJson(data);
@@ -75,6 +73,8 @@ export function registerScrapeCommand(program: Command): void {
         } else {
           // Job-based (batch) - wait for completion
           const job = result.data;
+          spinner.success(`Done -- ${job.results.length} pages`);
+
           if (opts.json) {
             outputJson(job);
           } else {
@@ -84,8 +84,8 @@ export function registerScrapeCommand(program: Command): void {
           }
         }
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        error(msg);
+        spinner.error("Failed");
+        error(formatError(err));
         process.exit(1);
       }
     });

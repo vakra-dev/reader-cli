@@ -86,6 +86,6 @@ describe("auth errors", () => {
     const output = runFail("status", {
       READER_API_KEY: "rdr_invalid_key_that_does_not_exist",
     });
-    expect(output).toContain("connection failed");
+    expect(output).toContain("Error");
   });
 });
