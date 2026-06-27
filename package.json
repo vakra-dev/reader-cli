@@ -1,6 +1,6 @@
 {
   "name": "@vakra-dev/reader-cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "CLI for the Reader API - read the web for your AI agents",
   "type": "module",
   "bin": {
